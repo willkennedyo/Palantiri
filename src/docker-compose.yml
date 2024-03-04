@@ -11,28 +11,24 @@ services:
       - 443:443
     environment:
       - ASPNETCORE_ENVIRONMENT=Development
-
       - ASPNETCORE_URLS=https://+:443;http://+:80
-
       - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
-      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
-      
-      - AppSettings__AmazonSQS__AccessKey=${AWS_ACCESSKEY}
-      - AppSettings__AmazonSQS__SecretKey=${AWS_SECRETKEY}
-      - AppSettings__AmazonSQS__ServiceUrl=${AWS_SERVICEURL}
-      - AppSettings__AmazonSQS__ItensToConsume=${AWS_CONSUME}
-      - AppSettings__AmazonSQS__TimeoutSeconds=${AWS_TIMEOUT}
-      - AppSettings__AmazonSQS__Queues__Consumer=${AWS_QUEUE}
-
-      - AppSettings__AmazonS3__AccessKey=${AWS_ACCESSKEY}
-      - AppSettings__AmazonS3__SecretKey=${AWS_SECRETKEY}
-      - AppSettings__AmazonS3__ServiceUrl=${AWS_S3_URL}
-      - AppSettings__AmazonS3__Buckets__Receiver=${AWS_S3}
-
-      - AppSettings__AmazonGlacier__AccessKey=${AWS_ACCESSKEY}
-      - AppSettings__AmazonGlacier__SecretKey=${AWS_SECRETKEY}
-      - AppSettings__AmazonGlacier__ServiceUrl=${AWS_GLACIER_URL}
-      - AppSettings__AmazonGlacier__Buckets__Receiver=${AWS_GLACIER}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}      
+      - AmazonSQS__AccessKey=${AWS_ACCESSKEY}
+      - AmazonSQS__SecretKey=${AWS_SECRETKEY}
+      - AmazonSQS__ServiceUrl=${AWS_SERVICEURL}
+      - AmazonSQS__ItensToConsume=${AWS_CONSUME}
+      - AmazonSQS__TimeoutSeconds=${AWS_TIMEOUT}
+      - AmazonSQS__Queues__Consumer=${AWS_QUEUE}
+      - AmazonSQS__Queues__Publisher=${AWS_QUEUE}
+      - AmazonS3__AccessKey=${AWS_ACCESSKEY}
+      - AmazonS3__SecretKey=${AWS_SECRETKEY}
+      - AmazonS3__ServiceUrl=${AWS_S3_URL}
+      - AmazonS3__Buckets__Receiver=${AWS_S3}
+      - AmazonGlacier__AccessKey=${AWS_ACCESSKEY}
+      - AmazonGlacier__SecretKey=${AWS_SECRETKEY}
+      - AmazonGlacier__ServiceUrl=${AWS_GLACIER_URL}
+      - AmazonGlacier__Buckets__Receiver=${AWS_GLACIER}
       
     volumes:
       - ~/.aspnet/https:/https:ro

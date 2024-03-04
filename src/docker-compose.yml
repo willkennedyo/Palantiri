@@ -1,0 +1,108 @@
+version: '3.4'
+
+services:
+  palantiri.rest:
+    image: ${DOCKER_REGISTRY-}palantirirest
+    build:
+      context: .
+      dockerfile: Palantiri.Rest/Dockerfile
+    ports:
+      - 80:80
+      - 443:443
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+
+      - ASPNETCORE_URLS=https://+:443;http://+:80
+
+      - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
+      - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}
+      
+      - AppSettings__AmazonSQS__AccessKey=${AWS_ACCESSKEY}
+      - AppSettings__AmazonSQS__SecretKey=${AWS_SECRETKEY}
+      - AppSettings__AmazonSQS__ServiceUrl=${AWS_SERVICEURL}
+      - AppSettings__AmazonSQS__ItensToConsume=${AWS_CONSUME}
+      - AppSettings__AmazonSQS__TimeoutSeconds=${AWS_TIMEOUT}
+      - AppSettings__AmazonSQS__Queues__Consumer=${AWS_QUEUE}
+
+      - AppSettings__AmazonS3__AccessKey=${AWS_ACCESSKEY}
+      - AppSettings__AmazonS3__SecretKey=${AWS_SECRETKEY}
+      - AppSettings__AmazonS3__ServiceUrl=${AWS_S3_URL}
+      - AppSettings__AmazonS3__Buckets__Receiver=${AWS_S3}
+
+      - AppSettings__AmazonGlacier__AccessKey=${AWS_ACCESSKEY}
+      - AppSettings__AmazonGlacier__SecretKey=${AWS_SECRETKEY}
+      - AppSettings__AmazonGlacier__ServiceUrl=${AWS_GLACIER_URL}
+      - AppSettings__AmazonGlacier__Buckets__Receiver=${AWS_GLACIER}
+      
+    volumes:
+      - ~/.aspnet/https:/https:ro
+
+
+        
+  tempo:
+    image: grafana/tempo:latest
+    ports:
+      - "3200:3200"
+     # - "4317:4317"
+      - "4318:4318"
+      - "9411:9411"
+      - "55680:55680"
+      - "55681:55681"
+      - "14250:14250"
+    command: [ "-config.file=/etc/tempo.yaml" ]
+    volumes:
+      - ../devops/config/tempo.yaml:/etc/tempo.yaml
+      - ../devops/tempo-data:/tmp/tempo
+      
+  loki:
+    image: grafana/loki:latest
+    ports:
+      - "3100:3100"
+    command: -config.file=/etc/loki/local-config.yaml
+    volumes:
+     - ../devops/config/loki.yaml:/etc/config/loki.yaml
+
+  mimir:
+    image: grafana/mimir:latest
+    command: ["-ingester.native-histograms-ingestion-enabled=true", "-config.file=/etc/mimir.yaml"]
+    ports:
+      - "9009:9009"
+    volumes:
+      - "../devops/config/mimir.yaml:/etc/mimir.yaml"
+
+
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"      
+    volumes:
+      - "../devops/config/grafana/definitions:/var/lib/grafana/dashboards"
+      - "../devops/config/grafana/provisioning:/etc/grafana/provisioning"
+    environment:
+      - GF_INSTALL_PLUGINS=grafana-piechart-panel
+      - GF_AUTH_ANONYMOUS_ENABLED=true
+      - GF_AUTH_ANONYMOUS_ORG_ROLE=Admin
+      - GF_AUTH_DISABLE_LOGIN_FORM=true
+      - GF_FEATURE_TOGGLES_ENABLE=traceqlEditor traceQLStreaming metricsSummary
+
+  # This creates a writeable Tempo data source and a couple of correlations.
+  # NOTE: This relies on the Tempo data source not existing at first start, should you delete
+  #       the Tempo data source and re-run this service (via a `docker compose up`), extra
+  #       copies of correlations will be generated!
+  # grafana_api_data:
+  #   build: ./curl
+  #   depends_on:
+  #     - grafana
+
+  otel:
+    image: otel/opentelemetry-collector-contrib
+    container_name: otel
+    command: ["--config=/etc/otel-collector-config.yaml"]
+    volumes:
+      - ../devops/config/otel.yaml:/etc/otel-collector-config.yaml
+    ports:     
+      - "12347:12345"
+      - "12348:12348"
+      - "6832:6832"
+      - "55679:55679"
+      - "4317:4317"

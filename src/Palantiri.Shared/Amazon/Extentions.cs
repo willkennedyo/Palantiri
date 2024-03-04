@@ -1,0 +1,33 @@
+﻿using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Palantiri.Shared.Amazon.S3;
+using Palantiri.Shared.Amazon.SQS;
+using Palantiri.Shared.SQS;
+
+namespace Palantiri.Shared.Amazon
+{
+    public static class Extentions
+    {
+        public static IServiceCollection AddSQS(this IServiceCollection services, IConfiguration config)
+        {
+            services.Configure<AmazonSQSOptions>(
+                config.GetSection(AmazonSQSOptions.AmazonSQS));
+
+            services.AddScoped<IMessagePublisher, MessagePublisher>();
+            services.AddScoped<IMessageConsumer, MessageConsumer>();
+
+            return services;
+        }
+        public static IServiceCollection AddS3(this IServiceCollection services, IConfiguration config)
+        {
+
+            services.Configure<AmazonS3Options>(
+                config.GetSection(AmazonS3Options.AmazonS3));
+
+            services.AddScoped<IReadRepository, ReadRepository>();
+            services.AddScoped<IWriteRepository, WriteRepository>();
+
+            return services;
+        }
+    }
+}

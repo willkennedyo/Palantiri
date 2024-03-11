@@ -14,16 +14,16 @@ using Palantiri.Shared.Observability.TraceContext;
 
 namespace Palantiri.Shared.Amazon.S3
 {
-    public class WriteRepository(IOptions<AmazonS3Options> options, ILoggerFactory logger) : IWriteRepository
+    public class WriteRepository(IOptions<AmazonOptions> options, ILoggerFactory logger) : IWriteRepository
     {
 
-        private readonly AmazonS3Options _options = options.Value;
+        private readonly AmazonOptions _options = options.Value;
 
         private readonly AmazonS3Client _amazonS3 = new(
                 new BasicAWSCredentials(options.Value.AccessKey, options.Value.SecretKey),
                 new AmazonS3Config
                 {
-                    ServiceURL = options.Value.ServiceUrl
+                    ServiceURL = options.Value.S3.ServiceUrl
                 });
 
         private readonly ILogger _logger = logger.CreateLogger<WriteRepository>();
@@ -57,7 +57,7 @@ namespace Palantiri.Shared.Amazon.S3
             var request = new PutObjectRequest()
             {
                 InputStream = stream,
-                BucketName = _options.Buckets["Publisher"],
+                BucketName = _options.S3.Buckets["Publisher"],
                 Key = path,
                 ContentType = type
             };
@@ -95,7 +95,7 @@ namespace Palantiri.Shared.Amazon.S3
             // Inject the ActivityContext into the message headers to propagate trace context to the receiving service.
             try
             {
-                DeleteObjectResponse response = await _amazonS3.DeleteObjectAsync(_options.Buckets["Publisher"], filePath);
+                DeleteObjectResponse response = await _amazonS3.DeleteObjectAsync(_options.S3.Buckets["Publisher"], filePath);
 
                 activity.AddTag("file-path", filePath);
                 activity.SetStatus(response.HttpStatusCode == HttpStatusCode.OK ? ActivityStatusCode.Ok : ActivityStatusCode.Error);

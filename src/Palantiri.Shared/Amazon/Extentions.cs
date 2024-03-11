@@ -10,8 +10,8 @@ namespace Palantiri.Shared.Amazon
     {
         public static IServiceCollection AddSQS(this IServiceCollection services, IConfiguration config)
         {
-            services.Configure<AmazonSQSOptions>(
-                config.GetSection(AmazonSQSOptions.AmazonSQS));
+            services.Configure<AmazonOptions>(
+                config.GetSection(AmazonOptions.Amazon));
 
             services.AddScoped<IMessagePublisher, MessagePublisher>();
             services.AddScoped<IMessageConsumer, MessageConsumer>();
@@ -20,9 +20,8 @@ namespace Palantiri.Shared.Amazon
         }
         public static IServiceCollection AddS3(this IServiceCollection services, IConfiguration config)
         {
-
-            services.Configure<AmazonS3Options>(
-                config.GetSection(AmazonS3Options.AmazonS3));
+            services.Configure<AmazonOptions>(
+                config.GetSection(AmazonOptions.Amazon));
 
             services.AddScoped<IReadRepository, ReadRepository>();
             services.AddScoped<IWriteRepository, WriteRepository>();

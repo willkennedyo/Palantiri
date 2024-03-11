@@ -17,13 +17,13 @@ namespace Palantiri.Shared.Amazon.SQS
     public class MessageConsumer : IMessageConsumer
     {
         private readonly AmazonSQSClient _amazonSQS;
-        private readonly AmazonSQSOptions _options;
+        private readonly AmazonOptions _options;
 
         private readonly ILogger _logger;
 
         private static readonly ActivitySource _activitySource = new(nameof(MessageConsumer));
         private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
-        public MessageConsumer(IOptions<AmazonSQSOptions> options, ILoggerFactory logger)
+        public MessageConsumer(IOptions<AmazonOptions> options, ILoggerFactory logger)
         {
             _logger = logger.CreateLogger<MessagePublisher>();
             _options = options.Value;
@@ -31,7 +31,7 @@ namespace Palantiri.Shared.Amazon.SQS
                 new BasicAWSCredentials(_options.AccessKey, _options.SecretKey),
                 new AmazonSQSConfig
                 {
-                    ServiceURL = _options.ServiceUrl
+                    ServiceURL = _options.SQS.ServiceUrl
                 });
 
         }
@@ -43,6 +43,7 @@ namespace Palantiri.Shared.Amazon.SQS
             // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/messaging/messaging-spans.md#span-name
             
             using (var activity = _activitySource.StartActivity("AWS:SQS:ConsumeMessages", ActivityKind.Consumer, null, links: null))
+
             {
                 ReceiveMessageResponse receiveMessageResponse = await ReceiveMessages();
 
@@ -109,10 +110,10 @@ namespace Palantiri.Shared.Amazon.SQS
 
             return new()
             {
-                QueueUrl = _options.Queues["Consumer"],
+                QueueUrl = _options.SQS.Queues["Consumer"],
                 MessageAttributeNames = attributesList,
-                MaxNumberOfMessages = _options.ItemsToConsume,
-                WaitTimeSeconds = _options.TimeoutSeconds,
+                MaxNumberOfMessages = _options.SQS.ItemsToConsume,
+                WaitTimeSeconds = _options.SQS.TimeoutSeconds,
             };
         }
 
@@ -136,7 +137,7 @@ namespace Palantiri.Shared.Amazon.SQS
                     Id = _.MessageId,
                     ReceiptHandle = _.ReceiptHandle
                 }).ToList(),
-                QueueUrl = _options.Queues["Consumer"]
+                QueueUrl = _options.SQS.Queues["Consumer"]
             };
 
             await _amazonSQS.DeleteMessageBatchAsync(request);

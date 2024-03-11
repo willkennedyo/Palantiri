@@ -47,7 +47,7 @@ namespace Palantiri.Rest.Controllers
                 }
 
                 var stream = new MemoryStream(fileBytes);
-                string fileName = Guid.NewGuid().ToString() + ".txt";
+                string fileName = Guid.NewGuid().ToString() + "." + command.File.FileName.Split(".").Last();
 
                 //string destination = Path.Combine( "trace", fileName);
 

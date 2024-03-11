@@ -12,16 +12,16 @@ using Palantiri.Shared.Observability.TraceContext;
 
 namespace Palantiri.Shared.Amazon.S3
 {
-    public class ReadRepository(IOptions<AmazonS3Options> options, ILoggerFactory logger) : IReadRepository
+    public class ReadRepository(IOptions<AmazonOptions> options, ILoggerFactory logger) : IReadRepository
     {
 
-        private readonly AmazonS3Options _options = options.Value;
+        private readonly AmazonOptions _options = options.Value;
 
         private readonly AmazonS3Client _amazonS3 = new AmazonS3Client(
                 new BasicAWSCredentials(options.Value.AccessKey, options.Value.SecretKey),
                 new AmazonS3Config
                 {
-                    ServiceURL = options.Value.ServiceUrl,
+                    ServiceURL = options.Value.S3.ServiceUrl,
                 });
 
         private readonly ILogger _logger = logger.CreateLogger<ReadRepository>();
@@ -48,7 +48,7 @@ namespace Palantiri.Shared.Amazon.S3
 
             var request = new GetObjectRequest()
             {
-                BucketName = _options.Buckets["Publisher"],
+                BucketName = _options.S3.Buckets["Publisher"],
                 Key = path
             };
             try

@@ -14,21 +14,18 @@ services:
       - ASPNETCORE_URLS=https://+:443;http://+:80
       - ASPNETCORE_Kestrel__Certificates__Default__Password=${ASPNETCORE_Kestrel__Certificates__Default__Password}
       - ASPNETCORE_Kestrel__Certificates__Default__Path=${ASPNETCORE_Kestrel__Certificates__Default__Path}      
-      - AmazonSQS__AccessKey=${AWS_ACCESSKEY}
-      - AmazonSQS__SecretKey=${AWS_SECRETKEY}
-      - AmazonSQS__ServiceUrl=${AWS_SERVICEURL}
-      - AmazonSQS__ItensToConsume=${AWS_CONSUME}
-      - AmazonSQS__TimeoutSeconds=${AWS_TIMEOUT}
-      - AmazonSQS__Queues__Consumer=${AWS_QUEUE}
-      - AmazonSQS__Queues__Publisher=${AWS_QUEUE}
-      - AmazonS3__AccessKey=${AWS_ACCESSKEY}
-      - AmazonS3__SecretKey=${AWS_SECRETKEY}
-      - AmazonS3__ServiceUrl=${AWS_S3_URL}
-      - AmazonS3__Buckets__Receiver=${AWS_S3}
-      - AmazonGlacier__AccessKey=${AWS_ACCESSKEY}
-      - AmazonGlacier__SecretKey=${AWS_SECRETKEY}
-      - AmazonGlacier__ServiceUrl=${AWS_GLACIER_URL}
-      - AmazonGlacier__Buckets__Receiver=${AWS_GLACIER}
+      - Amazon__AccessKey=${AWS_ACCESSKEY}
+      - Amazon__SecretKey=${AWS_SECRETKEY}
+      - Amazon__SQS__ServiceUrl=${AWS_SERVICEURL}
+      - Amazon__SQS__ItensToConsume=${AWS_CONSUME}
+      - Amazon__SQS__TimeoutSeconds=${AWS_TIMEOUT}
+      - Amazon__SQS__Queues__Consumer=${AWS_QUEUE}
+      - Amazon__SQS__Queues__Publisher=${AWS_QUEUE}
+      - Amazon__S3__ServiceUrl=${AWS_S3_URL}
+      - Amazon__S3__Buckets__Consumer=${AWS_S3}
+      - Amazon__S3__Buckets__Publisher=${AWS_S3}
+      - Amazon__Glacier__ServiceUrl=${AWS_GLACIER_URL}
+      - Amazon__Glacier__Buckets__Receiver=${AWS_GLACIER}
       
     volumes:
       - ~/.aspnet/https:/https:ro

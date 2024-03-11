@@ -16,7 +16,7 @@ namespace Palantiri.Shared.Observability
 {
     public static class Extentions
     {
-        public static IServiceCollection AddOpentelemetry(this IServiceCollection services, IConfiguration config)
+        public static IServiceCollection AddOpentelemetry(this IServiceCollection services, IConfiguration? config)
         {
             var settings = config
                         .GetSection(nameof(OpenTelemetrySettings))
@@ -43,9 +43,9 @@ namespace Palantiri.Shared.Observability
             Sdk.SetDefaultTextMapPropagator(new CompositeTextMapPropagator(new TextMapPropagator[]
             {
                 new OpenTelemetry.Extensions.Propagators.B3Propagator()
-                //,
-                //new BaggagePropagator(),
-                //new AWSXRayPropagator()
+                ,
+                new BaggagePropagator(),
+                new AWSXRayPropagator()
             }));
 
             void exporterResource(OtlpExporterOptions exporterOptions)

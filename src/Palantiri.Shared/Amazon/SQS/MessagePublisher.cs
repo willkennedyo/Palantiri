@@ -16,13 +16,13 @@ namespace Palantiri.Shared.Amazon.SQS
     public class MessagePublisher : IMessagePublisher
     {
         private readonly AmazonSQSClient _amazonSQS;
-        private readonly AmazonSQSOptions _options;
+        private readonly AmazonOptions _options;
 
         private readonly ILogger _logger;
 
         private static readonly ActivitySource _activitySource = new(nameof(MessagePublisher));
-        private static readonly TextMapPropagator Propagator = Propagators.DefaultTextMapPropagator;
-        public MessagePublisher(IOptions<AmazonSQSOptions> options, ILoggerFactory logger)
+        private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
+        public MessagePublisher(IOptions<AmazonOptions> options, ILoggerFactory logger)
         {
             _logger = logger.CreateLogger<MessagePublisher>();
             _options = options.Value;
@@ -30,7 +30,7 @@ namespace Palantiri.Shared.Amazon.SQS
                 new BasicAWSCredentials(_options.AccessKey, _options.SecretKey),
                 new AmazonSQSConfig
                 {
-                    ServiceURL = _options.ServiceUrl
+                    ServiceURL = _options.SQS.ServiceUrl
                 });
         }
 
@@ -55,7 +55,7 @@ namespace Palantiri.Shared.Amazon.SQS
             }
             var props = new Dictionary<string, MessageAttributeValue>();
             // Inject the ActivityContext into the message headers to propagate trace context to the receiving service.
-            Propagator.Inject(new PropagationContext(contextToInject, Baggage.Current), props, AmazonTraceContext.InjectTraceContextIntoBasicProperties);
+            _propagator.Inject(new PropagationContext(contextToInject, Baggage.Current), props, AmazonTraceContext.InjectTraceContextIntoBasicProperties);
 
 
             var request = new SendMessageRequest()
@@ -63,7 +63,7 @@ namespace Palantiri.Shared.Amazon.SQS
                 //MessageGroupId = message.GroupId,
                 //MessageDeduplicationId = message.DeduplicationId,
                 MessageBody = JsonSerializer.Serialize(message),
-                QueueUrl = _options.Queues["Publisher"],
+                QueueUrl = _options.SQS.Queues["Publisher"],
                 MessageAttributes = props
             };
             var response = await _amazonSQS.SendMessageAsync( request);
@@ -85,7 +85,7 @@ namespace Palantiri.Shared.Amazon.SQS
                 i++;
             }
 
-            await _amazonSQS.SendMessageBatchAsync(_options.Queues["Publisher"], entries);
+            await _amazonSQS.SendMessageBatchAsync(_options.SQS.Queues["Publisher"], entries);
         }
     }
 }

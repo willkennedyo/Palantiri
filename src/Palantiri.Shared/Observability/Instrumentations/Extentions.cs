@@ -4,6 +4,7 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Palantiri.Shared.Observability.Exporters;
+using OpenTelemetry.Contrib.Extensions.AWSXRay.Trace;
 
 namespace Palantiri.Shared.Observability.Configurations
 {
@@ -19,7 +20,7 @@ namespace Palantiri.Shared.Observability.Configurations
             tracerProvider
                 .SetResourceBuilder(resource().AddTelemetrySdk());
 
-            foreach (var instrumentation in settings.Instrimentations!)
+            foreach (var instrumentation in settings.Instrumentations!)
             {
                 switch (instrumentation)
                 {
@@ -47,10 +48,11 @@ namespace Palantiri.Shared.Observability.Configurations
                     case Enums.EnumInstrumentation.Process:
                     case Enums.EnumInstrumentation.Redis:
                     case Enums.EnumInstrumentation.XRayTraceId:
+                        //tracerProvider.AddXRayTraceId();
                         break;
                 }
             }
-            //TO-DO solve this
+
             tracerProvider.AddSource(settings.ServiceName, nameof(MessageConsumer), nameof(MessagePublisher));
 
             tracerProvider.ConfigureExporters(settings, exporterResource);
@@ -64,7 +66,7 @@ namespace Palantiri.Shared.Observability.Configurations
             meterProviderBuilder
                 .SetResourceBuilder(resource().AddTelemetrySdk());
 
-            foreach (var instrumentation in settings.Instrimentations!)
+            foreach (var instrumentation in settings.Instrumentations!)
             {
                 switch (instrumentation)
                 {

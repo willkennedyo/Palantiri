@@ -7,7 +7,10 @@
   </PropertyGroup>
 	
 	<ItemGroup>
+		<PackageReference Include="Amazon.Lambda.SNSEvents" Version="2.1.0" />
+		<PackageReference Include="Amazon.Lambda.SQSEvents" Version="2.2.0" />
 		<PackageReference Include="AWSSDK.S3" Version="3.7.305.28" />
+		<PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.301.3" />
 		<PackageReference Include="AWSSDK.SQS" Version="3.7.300.52" />
 		<PackageReference Include="Newtonsoft.Json" Version="13.0.3" />
 		<PackageReference Include="OpenTelemetry" Version="1.7.0" />
@@ -27,18 +30,5 @@
 		<PackageReference Include="OpenTelemetry.Instrumentation.MySqlData" Version="1.0.0-beta.7" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.SqlClient" Version="1.5.1-beta.1" />
 		<PackageReference Include="OpenTelemetry.Instrumentation.StackExchangeRedis" Version="1.0.0-rc9.10" /> -->
-	</ItemGroup>
-
-	<ItemGroup>	
-		<!--<PackageReference Include="MySql.EntityFrameworkCore" Version="8.0.0" />
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Tools" Version="8.0.2">	
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>-->
-		<!-- <PackageReference Include="Vsxmd" Version="1.4.5">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference> -->
-		<!--<PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="8.0.0" />-->
 	</ItemGroup>
 </Project>

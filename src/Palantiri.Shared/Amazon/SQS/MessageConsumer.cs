@@ -8,8 +8,6 @@ using Palantiri.Shared.Dtos;
 using Palantiri.Shared.SQS;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenTelemetry.Context.Propagation;
-using Palantiri.Shared.Observability.TraceContext;
 
 namespace Palantiri.Shared.Amazon.SQS
 {
@@ -22,7 +20,6 @@ namespace Palantiri.Shared.Amazon.SQS
         private readonly ILogger _logger;
 
         private static readonly ActivitySource _activitySource = new(nameof(MessageConsumer));
-        private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
         public MessageConsumer(IOptions<AmazonOptions> options, ILoggerFactory logger)
         {
             _logger = logger.CreateLogger<MessagePublisher>();
@@ -38,62 +35,34 @@ namespace Palantiri.Shared.Amazon.SQS
 
         public async Task ConsumeAsync<T>(Func<IEnumerable<T>,CancellationToken, Task<IEnumerable<T>>> handler, CancellationToken token) where T : IIdentifiable<Guid>
         {
+            using var activity = _activitySource.StartActivity("AWS:SQS:ConsumeMessages", ActivityKind.Consumer, null, links: null);
+            ReceiveMessageResponse receiveMessageResponse = await ReceiveMessages();
 
-            // Start an activity with a name following the semantic convention of the OpenTelemetry messaging specification.
-            // https://github.com/open-telemetry/semantic-conventions/blob/main/docs/messaging/messaging-spans.md#span-name
-            
-            using (var activity = _activitySource.StartActivity("AWS:SQS:ConsumeMessages", ActivityKind.Consumer, null, links: null))
+            ConcurrentBag<Activity> activities = [];
 
+            Dictionary<Guid, Message> messagesById = [];
+            List<T> messagesToProcess = [];
+
+            for (int i = 0; i < receiveMessageResponse.Messages.Count; i++)
             {
-                ReceiveMessageResponse receiveMessageResponse = await ReceiveMessages();
+                var message = receiveMessageResponse.Messages[i];
+                var deserialazedMessage = JsonSerializer.Deserialize<T>(message.Body);
+                if (deserialazedMessage == null) continue;
 
-                ConcurrentBag<Activity> activities = [];
-
-                for (int i = 0; i < receiveMessageResponse.Messages.Count; i++)
-                {
-                    var message = receiveMessageResponse.Messages[i];
-                    // Extract the PropagationContext of the upstream parent from the message headers.
-                    var parentContext = _propagator.Extract(default, message.MessageAttributes, AmazonTraceContext.ExtractTraceContextFromBasicProperties);
-                    //Baggage.Current = parentContext.Baggage;
-                    activity?.SetParentId(parentContext.ActivityContext.TraceId, parentContext.ActivityContext.SpanId, ActivityTraceFlags.Recorded);
-
-                    using (var activityWithLinks = _activitySource.StartActivity("AWS:SQS:Consume", ActivityKind.Consumer, parentContext.ActivityContext, links: new List<ActivityLink>() { new(activity!.Context) }))
-                    {
-                        if (activityWithLinks is not null)
-                            activities.Add(activityWithLinks);
-
-                        activity.SetParentId(parentContext.ActivityContext.TraceId, parentContext.ActivityContext.SpanId, ActivityTraceFlags.Recorded);
-                        activityWithLinks?.AddEvent(new ActivityEvent("Message received"));
-
-                        activityWithLinks?.AddTag("message", message.Body);
-                        activityWithLinks?.AddTag("message-id", message.MessageId);
-                    }
-                }
-                Dictionary<Guid, Message> messagesById = [];
-                List<T> messagesToProcess = [];
-
-                for (int i = 0; i < receiveMessageResponse.Messages.Count; i++)
-                {
-                    var message = receiveMessageResponse.Messages[i];
-                    var deserialazedMessage = JsonSerializer.Deserialize<T>(message.Body);
-                    if (deserialazedMessage == null) continue;
-
-                    messagesToProcess.Add(deserialazedMessage);
-                    messagesById.Add(deserialazedMessage.Id, message);
-                }
-
-                var handlerResult = await handler(messagesToProcess, token);
-
-                var processedIds = handlerResult.Select(_ => _.Id);
-                var messagesToDelete = messagesById.Where(_ => processedIds.Contains(_.Key)).Select(_ => _.Value);
-
-                if (!messagesToDelete.Any())
-                    return;
-                await DeleteMessagesAsync(messagesToDelete);
-
-                activity?.Stop();
-
+                messagesToProcess.Add(deserialazedMessage);
+                messagesById.Add(deserialazedMessage.Id, message);
             }
+
+            var handlerResult = await handler(messagesToProcess, token);
+
+            var processedIds = handlerResult.Select(_ => _.Id);
+            var messagesToDelete = messagesById.Where(_ => processedIds.Contains(_.Key)).Select(_ => _.Value);
+
+            if (!messagesToDelete.Any())
+                return;
+            await DeleteMessagesAsync(messagesToDelete);
+
+            activity?.Stop();
         }
 
         private async Task<ReceiveMessageResponse> ReceiveMessages()
@@ -118,14 +87,40 @@ namespace Palantiri.Shared.Amazon.SQS
         }
 
 
-        public Task<T> ConsumeAsync<T>() where T : IIdentifiable<Guid>
+        public async Task<T> ConsumeAsync<T>() where T : IIdentifiable<Guid>
         {
-            throw new NotImplementedException();
+            ReceiveMessageResponse receiveMessageResponse = await ReceiveMessages();
+
+            if (receiveMessageResponse?.Messages.Any() != true)
+                return default;
+            
+            await DeleteMessagesAsync(receiveMessageResponse.Messages.Take(1));
+            
+                var message = receiveMessageResponse.Messages.First();
+            return JsonSerializer.Deserialize<T>(message.Body);
         }
 
-        public Task<IEnumerable<T>> ConsumeListAsync<T>() where T : IIdentifiable<Guid>
+        public async Task<IEnumerable<T>> ConsumeListAsync<T>() where T : IIdentifiable<Guid>
         {
-            throw new NotImplementedException();
+            ReceiveMessageResponse receiveMessageResponse = await ReceiveMessages();
+            
+            if (receiveMessageResponse?.Messages.Any() != true)
+                return default;
+
+            Dictionary<Guid, Message> messagesById = [];
+            List<T> messagesToProcess = [];
+
+            for (int i = 0; i < receiveMessageResponse.Messages.Count; i++)
+            {
+                var message = receiveMessageResponse.Messages[i];
+                var deserialazedMessage = JsonSerializer.Deserialize<T>(message.Body);
+                if (deserialazedMessage == null) continue;
+
+                messagesToProcess.Add(deserialazedMessage);
+                messagesById.Add(deserialazedMessage.Id, message);
+            }
+            await DeleteMessagesAsync(receiveMessageResponse.Messages);
+            return messagesToProcess;
         }
 
         public async Task DeleteMessagesAsync(IEnumerable<Message> messagesToDelete)

@@ -6,9 +6,6 @@ using Amazon.SQS.Model;
 using Palantiri.Shared.SQS;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-using OpenTelemetry;
-using OpenTelemetry.Context.Propagation;
-using Palantiri.Shared.Observability.TraceContext;
 
 namespace Palantiri.Shared.Amazon.SQS
 {
@@ -21,7 +18,6 @@ namespace Palantiri.Shared.Amazon.SQS
         private readonly ILogger _logger;
 
         private static readonly ActivitySource _activitySource = new(nameof(MessagePublisher));
-        private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
         public MessagePublisher(IOptions<AmazonOptions> options, ILoggerFactory logger)
         {
             _logger = logger.CreateLogger<MessagePublisher>();
@@ -39,11 +35,6 @@ namespace Palantiri.Shared.Amazon.SQS
 
             using var activity = _activitySource.StartActivity("AWS:SQS:Publish", ActivityKind.Producer);
 
-            // Depending on Sampling (and whether a listener is registered or not), the
-            // activity above may not be created.
-            // If it is created, then propagate its context.
-            // If it is not created, the propagate the Current context,
-            // if any.
             ActivityContext contextToInject = default;
             if (activity != null)
             {
@@ -53,20 +44,17 @@ namespace Palantiri.Shared.Amazon.SQS
             {
                 contextToInject = Activity.Current.Context;
             }
-            var props = new Dictionary<string, MessageAttributeValue>();
-            // Inject the ActivityContext into the message headers to propagate trace context to the receiving service.
-            _propagator.Inject(new PropagationContext(contextToInject, Baggage.Current), props, AmazonTraceContext.InjectTraceContextIntoBasicProperties);
-
-
+            
             var request = new SendMessageRequest()
             {
                 //MessageGroupId = message.GroupId,
                 //MessageDeduplicationId = message.DeduplicationId,
                 MessageBody = JsonSerializer.Serialize(message),
-                QueueUrl = _options.SQS.Queues["Publisher"],
-                MessageAttributes = props
+                QueueUrl = _options.SQS.Queues["Publisher"]
             };
             var response = await _amazonSQS.SendMessageAsync( request);
+
+            activity?.Stop();
         }
 
         public async Task PublishAsync<T>(IEnumerable<T> messages) where T : class

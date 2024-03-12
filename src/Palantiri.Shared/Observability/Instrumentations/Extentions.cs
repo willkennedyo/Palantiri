@@ -4,7 +4,9 @@ using OpenTelemetry.Metrics;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
 using Palantiri.Shared.Observability.Exporters;
-using OpenTelemetry.Contrib.Extensions.AWSXRay.Trace;
+using Amazon.Runtime.Internal;
+using Palantiri.Shared.Observability.Customizers;
+using OpenTelemetry.Contrib.Instrumentation.AWS;
 
 namespace Palantiri.Shared.Observability.Configurations
 {
@@ -41,7 +43,9 @@ namespace Palantiri.Shared.Observability.Configurations
                         //     });
                         break;
                     case Enums.EnumInstrumentation.AWS:
-                        tracerProvider.AddAWSInstrumentation();
+                        var awsClientOptions = new AWSClientInstrumentationOptions();
+                        tracerProvider.AddSource(AWSPropagatorHandler.ACTIVITY_SOURCE_NAME);
+                        RuntimePipelineCustomizerRegistry.Instance.Register(new AWSPropagatorCustomizer(awsClientOptions));
                         break;
                     case Enums.EnumInstrumentation.HttpClient:
                     case Enums.EnumInstrumentation.Runtime:

@@ -1,0 +1,180 @@
+﻿using Amazon.Lambda.SNSEvents;
+using Amazon.Lambda.SQSEvents;
+using Amazon.Runtime;
+using Amazon.SimpleNotificationService.Model;
+using OpenTelemetry.Context.Propagation;
+using System.Diagnostics;
+using System.Text.Json;
+
+namespace Palantiri.Shared.Observability.Customizers.AWS.TraceContext
+{
+    public static class SNSTraceContext
+    {
+        private const int _maxMessageAttributes = 10;
+        internal static void AddAttributes(IRequestContext context, IReadOnlyDictionary<string, string> attributes)
+        {
+            var originalRequest = context.OriginalRequest as PublishRequest;
+            if (originalRequest?.MessageAttributes == null)
+            {
+                return;
+            }
+
+            if (attributes.Keys.Any(k => originalRequest.MessageAttributes.ContainsKey(k)))
+            {
+                // If at least one attribute is already present in the request then we skip the injection.
+                return;
+            }
+
+            int attributesCount = originalRequest.MessageAttributes.Count;
+            if (attributes.Count + attributesCount > _maxMessageAttributes)
+            {
+                // TODO: add logging (event source).
+                return;
+            }
+
+            foreach (var param in attributes)
+            {
+                originalRequest.MessageAttributes[param.Key] = new MessageAttributeValue { DataType = "String", StringValue = param.Value };
+            }
+        }
+
+        internal static IReadOnlyDictionary<string, string> InjectIntoDictionary(PropagationContext propagationContext)
+        {
+            var carrier = new Dictionary<string, string>();
+            Propagators.DefaultTextMapPropagator.Inject(propagationContext, carrier, (c, k, v) => c[k] = v);
+            return carrier;
+        }
+
+        // SNS attribute types: https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html
+        private const string SnsAttributeTypeString = "String";
+        private const string SnsAttributeTypeStringArray = "String.Array";
+        private const string SnsMessageAttributes = "MessageAttributes";
+
+        /// <summary>
+        /// Gets or sets a value indicating whether the parent Activity should be set when SQS message batch is received.
+        /// If option is set to true then the parent is set using the last received message otherwise the parent is not set at all.
+        /// </summary>
+        internal static bool SetParentFromMessageBatch { get; set; }
+
+        internal static (PropagationContext ParentContext, IEnumerable<ActivityLink>? Links) ExtractParentContext(SQSEvent sqsEvent)
+        {
+            if (sqsEvent?.Records == null)
+            {
+                return (default, null);
+            }
+
+            // We choose the last message (record) as the carrier to set the parent.
+            var parentRecord = SetParentFromMessageBatch ? sqsEvent.Records.LastOrDefault() : null;
+            var parentContext = (parentRecord != null) ? ExtractParentContext(parentRecord) : default;
+
+            var links = new List<ActivityLink>();
+            foreach (var record in sqsEvent.Records)
+            {
+                var context = ReferenceEquals(record, parentRecord) ? parentContext : ExtractParentContext(record);
+                if (context != default)
+                {
+                    links.Add(new ActivityLink(context.ActivityContext));
+                }
+            }
+
+            return (parentContext, links);
+        }
+
+        internal static PropagationContext ExtractParentContext(SQSEvent.SQSMessage sqsMessage)
+        {
+            if (sqsMessage?.MessageAttributes == null)
+            {
+                return default;
+            }
+
+            var parentContext = Propagators.DefaultTextMapPropagator.Extract(default, sqsMessage.MessageAttributes, SqsMessageAttributeGetter);
+            if (parentContext == default)
+            {
+                // SQS subscribed to SNS topic with raw delivery disabled case, i.e. SNS record serialized into SQS body.
+                // https://docs.aws.amazon.com/sns/latest/dg/sns-large-payload-raw-message-delivery.html
+                SNSEvent.SNSMessage? snsMessage = GetSnsMessage(sqsMessage);
+                parentContext = ExtractParentContext(snsMessage);
+            }
+
+            return parentContext;
+        }
+
+        internal static PropagationContext ExtractParentContext(SNSEvent snsEvent)
+        {
+            // We assume there can be only a single SNS record (message) and records list is kept in the model consistency.
+            // See https://aws.amazon.com/sns/faqs/#Reliability for details.
+            var record = snsEvent?.Records?.LastOrDefault();
+            return ExtractParentContext(record);
+        }
+
+        internal static PropagationContext ExtractParentContext(SNSEvent.SNSRecord? record)
+        {
+            return (record?.Sns?.MessageAttributes != null) ?
+                Propagators.DefaultTextMapPropagator.Extract(default, record.Sns.MessageAttributes, SnsMessageAttributeGetter) :
+                default;
+        }
+
+        internal static PropagationContext ExtractParentContext(SNSEvent.SNSMessage? message)
+        {
+            return (message?.MessageAttributes != null) ?
+                Propagators.DefaultTextMapPropagator.Extract(default, message.MessageAttributes, SnsMessageAttributeGetter) :
+                default;
+        }
+
+        private static IEnumerable<string>? SqsMessageAttributeGetter(IDictionary<string, SQSEvent.MessageAttribute> attributes, string attributeName)
+        {
+            if (!attributes.TryGetValue(attributeName, out var attribute))
+            {
+                return null;
+            }
+
+            return attribute?.StringValue != null ?
+                new[] { attribute.StringValue } :
+                attribute?.StringListValues;
+        }
+
+
+        private static IEnumerable<string>? SnsMessageAttributeGetter(IDictionary<string, SNSEvent.MessageAttribute> attributes, string attributeName)
+        {
+            if (!attributes.TryGetValue(attributeName, out var attribute))
+            {
+                return null;
+            }
+
+            switch (attribute?.Type)
+            {
+                case SnsAttributeTypeString when attribute.Value != null:
+                    return new[] { attribute.Value };
+                case SnsAttributeTypeStringArray when attribute.Value != null:
+                    // Multiple values are stored as CSV (https://docs.aws.amazon.com/sns/latest/dg/sns-message-attributes.html).
+                    return attribute.Value.Split(',');
+                default:
+                    return null;
+            }
+        }
+
+        private static SNSEvent.SNSMessage? GetSnsMessage(SQSEvent.SQSMessage sqsMessage)
+        {
+            SNSEvent.SNSMessage? snsMessage = null;
+
+            var body = sqsMessage.Body;
+            if (body != null &&
+                body.TrimStart().StartsWith('{') &&
+                body.Contains(SnsMessageAttributes, StringComparison.Ordinal))
+            {
+                try
+                {
+                    snsMessage = JsonSerializer.Deserialize<SNSEvent.SNSMessage>(body/*, SourceGenerationContext.Default.SNSMessage*/);
+                }
+                catch (Exception)
+                {
+                    // TODO: log exception.
+                    return null;
+                }
+            }
+
+            return snsMessage;
+        }
+
+    }
+}

@@ -5,12 +5,9 @@ using Amazon.SQS.Model;
 using Palantiri.Shared.Amazon.SQS;
 using Palantiri.Shared.SQS;
 using Microsoft.Extensions.Options;
-using OpenTelemetry.Context.Propagation;
-using OpenTelemetry;
 using System.Diagnostics;
 using System.Net;
 using Microsoft.Extensions.Logging;
-using Palantiri.Shared.Observability.TraceContext;
 
 namespace Palantiri.Shared.Amazon.S3
 {
@@ -29,18 +26,12 @@ namespace Palantiri.Shared.Amazon.S3
         private readonly ILogger _logger = logger.CreateLogger<WriteRepository>();
 
         private static readonly ActivitySource _activitySource = new(nameof(MessagePublisher));
-        private static readonly TextMapPropagator _propagator = Propagators.DefaultTextMapPropagator;
 
         public async Task WriteAsync(Stream stream, string type, string path)
         {
 
             using var activity = _activitySource.StartActivity("AWS:S3:Write", ActivityKind.Producer);
 
-            // Depending on Sampling (and whether a listener is registered or not), the
-            // activity above may not be created.
-            // If it is created, then propagate its context.
-            // If it is not created, the propagate the Current context,
-            // if any.
             ActivityContext contextToInject = default;
             if (activity != null)
             {
@@ -50,9 +41,6 @@ namespace Palantiri.Shared.Amazon.S3
             {
                 contextToInject = Activity.Current.Context;
             }
-            var props = new Dictionary<string, MessageAttributeValue>();
-            // Inject the ActivityContext into the message headers to propagate trace context to the receiving service.
-            _propagator.Inject(new PropagationContext(contextToInject, Baggage.Current), props, AmazonTraceContext.InjectTraceContextIntoBasicProperties);
 
             var request = new PutObjectRequest()
             {
@@ -61,7 +49,7 @@ namespace Palantiri.Shared.Amazon.S3
                 Key = path,
                 ContentType = type
             };
-            props.ToList().ForEach(_ => request.Metadata.Add(_.Key, _.Value.StringValue));
+
             try
             {
                 var response = await _amazonS3.PutObjectAsync(request);
@@ -77,11 +65,6 @@ namespace Palantiri.Shared.Amazon.S3
         {
             using var activity = _activitySource.StartActivity("AWS:S3:Write", ActivityKind.Producer);
 
-            // Depending on Sampling (and whether a listener is registered or not), the
-            // activity above may not be created.
-            // If it is created, then propagate its context.
-            // If it is not created, the propagate the Current context,
-            // if any.
             ActivityContext contextToInject = default;
             if (activity != null)
             {

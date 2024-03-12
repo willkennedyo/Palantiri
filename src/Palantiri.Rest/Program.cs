@@ -8,11 +8,11 @@ builder.Services.AddControllers();
 
 builder.Services.AddEndpointsApiExplorer()
     .AddSwaggerGen()
+    .AddOpentelemetry(builder.Configuration)
     .AddServices(builder.Configuration)
     .AddRepositories(builder.Configuration)
     .AddSQS(builder.Configuration)
-    .AddS3(builder.Configuration)
-    .AddOpentelemetry(builder.Configuration);
+    .AddS3(builder.Configuration);
 
 var app = builder.Build();
 

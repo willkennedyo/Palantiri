@@ -1,4 +1,5 @@
 using Microsoft.AspNetCore.Mvc;
+using Palantiri.Rest.Transport;
 using Palantiri.Shared.Amazon.SQS;
 
 namespace Palantiri.Rest.Controllers
@@ -35,22 +36,22 @@ namespace Palantiri.Rest.Controllers
 
         }
 
-        //[HttpGet]
-        //public async Task<ActionResult<string>> Consume()
-        //{
-        //    try
-        //    {
+        [HttpGet]
+        public async Task<ActionResult<string>> Consume()
+        {
+            try
+            {
 
-        //        _logger.LogInformation("Init consume...");               
+                _logger.LogInformation("Init consume...");
+                var result = await _consumer.ConsumeAsync<SQSMessage>();
+                return Ok(result);
 
-        //        return Ok(await _consumer.ConsumeAsync<Dictionary<string, string>>());
+            }
+            catch (Exception)
+            {
+                return BadRequest();
+            }
 
-        //    }
-        //    catch (Exception e)
-        //    {
-        //        return BadRequest();
-        //    }
-
-        //}
+        }
     }
 }

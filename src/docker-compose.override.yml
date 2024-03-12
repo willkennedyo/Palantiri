@@ -9,3 +9,6 @@ services:
     ports:
       - "8080"
       - "8081"
+  palantiri.worker.registry:
+    environment:
+      - DOTNET_ENVIRONMENT=Development

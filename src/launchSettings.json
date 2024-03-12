@@ -4,7 +4,8 @@
       "commandName": "DockerCompose",
       "commandVersion": "1.0",
       "serviceActions": {
-        "palantiri.rest": "StartDebugging"
+        "palantiri.rest": "StartDebugging",
+        "palantiri.worker.registry": "StartDebugging"
       }
     }
   }
